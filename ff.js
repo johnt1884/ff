@@ -49,6 +49,7 @@ document.addEventListener("visibilitychange", () => {
 
     // --- Global variables ---
     let otkViewer = null;
+    let allTimezones = [];
     let tweetCache = {};
     try {
         tweetCache = JSON.parse(localStorage.getItem(TWEET_CACHE_KEY)) || {};
@@ -1718,8 +1719,9 @@ function animateStatIncrease(statEl, plusNEl, from, to) {
         otkViewer.innerHTML = ''; // Clear previous content
 
         let allMessages = getAllMessagesSorted();
-    const messageLimitEnabled = localStorage.getItem('otkMessageLimitEnabled') !== 'false';
-        const messageLimitValue = parseInt(localStorage.getItem('otkMessageLimitValue') || '500', 10);
+    const themeSettings = JSON.parse(localStorage.getItem(THEME_SETTINGS_KEY)) || {};
+    const messageLimitEnabled = themeSettings.otkMessageLimitEnabled !== false;
+    const messageLimitValue = parseInt(themeSettings.otkMessageLimitValue || '500', 10);
 
         if (messageLimitEnabled && allMessages.length > messageLimitValue) {
             allMessages = allMessages.slice(allMessages.length - messageLimitValue);
@@ -1822,12 +1824,12 @@ updateDisplayedStatistics(false); // Update stats after all media processing is 
 
             let anchorScrolled = false;
             const storedAnchoredInstanceId = localStorage.getItem(ANCHORED_MESSAGE_ID_KEY);
-            console.log("storedAnchoredInstanceId from localStorage:", storedAnchoredInstanceId);
+            consoleLog("storedAnchoredInstanceId from localStorage:", storedAnchoredInstanceId);
 
             setTimeout(() => {
                 if (storedAnchoredInstanceId) {
                     const anchoredElement = document.getElementById(storedAnchoredInstanceId);
-                    console.log("anchoredElement from getElementById:", anchoredElement);
+                    consoleLog("anchoredElement from getElementById:", anchoredElement);
 
                     if (anchoredElement && messagesContainer.contains(anchoredElement)) {
                         try {
@@ -1862,6 +1864,7 @@ updateDisplayedStatistics(false); // Update stats after all media processing is 
 
             updateLoadingProgress(100, "View ready!"); // Update text for 100%
             setTimeout(hideLoadingScreen, 200);
+            applyThemeSettings({ forceRerender: false }); // Re-apply theme settings to ensure styles are correct after render
         }).catch(err => {
             consoleError("Error occurred during media loading promises:", err);
             updateLoadingProgress(100, "Error loading some media. View may be incomplete.");
@@ -2124,7 +2127,7 @@ function _populateAttachmentDivWithMedia(
         const observer = new MutationObserver(updateIconPositions);
 
         function updateIconPositions() {
-            console.log("updateIconPositions called");
+            consoleLog("updateIconPositions called");
             observer.disconnect(); // Disconnect the observer to prevent an infinite loop
             if (!resizeIcon || !img.isConnected) return;
             const iconWidth = 24;
@@ -2801,7 +2804,7 @@ function _populateAttachmentDivWithMedia(
             messageDiv.setAttribute('data-original-message-id', message.id);
 
             messageDiv.addEventListener('click', (event) => {
-                console.log("messageDiv clicked", persistentInstanceId);
+                consoleLog("messageDiv clicked", persistentInstanceId);
                 const target = event.target;
                 let preventAnchor = false;
 
@@ -2826,7 +2829,7 @@ function _populateAttachmentDivWithMedia(
                 }
 
                 if (preventAnchor) {
-                    console.log("Anchor prevented for", persistentInstanceId);
+                    consoleLog("Anchor prevented for", persistentInstanceId);
                     return; // Do not anchor
                 }
 
@@ -2835,7 +2838,7 @@ function _populateAttachmentDivWithMedia(
                 }
 
                 const isThisMessageAlreadyAnchored = messageDiv.classList.contains(ANCHORED_MESSAGE_CLASS);
-                console.log("isThisMessageAlreadyAnchored", isThisMessageAlreadyAnchored);
+                consoleLog("isThisMessageAlreadyAnchored", isThisMessageAlreadyAnchored);
 
                 // Un-highlight all currently anchored messages
                 document.querySelectorAll(`.${ANCHORED_MESSAGE_CLASS}`).forEach(el => {
@@ -2856,7 +2859,7 @@ function _populateAttachmentDivWithMedia(
 
             // Initial highlight check
             const initiallyStoredAnchoredId = localStorage.getItem(ANCHORED_MESSAGE_ID_KEY);
-            console.log("initiallyStoredAnchoredId", initiallyStoredAnchoredId, "persistentInstanceId", persistentInstanceId);
+            consoleLog("initiallyStoredAnchoredId", initiallyStoredAnchoredId, "persistentInstanceId", persistentInstanceId);
             if (persistentInstanceId === initiallyStoredAnchoredId) {
                 messageDiv.classList.add(ANCHORED_MESSAGE_CLASS);
             }
@@ -3389,7 +3392,7 @@ function _populateAttachmentDivWithMedia(
 
             // Initial highlight check when the element is first created
             const initiallyStoredAnchoredId = localStorage.getItem(ANCHORED_MESSAGE_ID_KEY);
-            console.log("initiallyStoredAnchoredId", initiallyStoredAnchoredId, "persistentInstanceId", persistentInstanceId);
+            consoleLog("initiallyStoredAnchoredId", initiallyStoredAnchoredId, "persistentInstanceId", persistentInstanceId);
             if (persistentInstanceId === initiallyStoredAnchoredId) {
                 messageDiv.classList.add(ANCHORED_MESSAGE_CLASS);
             }
@@ -3467,8 +3470,9 @@ function _populateAttachmentDivWithMedia(
         newContentDiv.appendChild(separatorDiv);
 
         const mediaLoadPromises = [];
-        const messageLimitEnabled = localStorage.getItem('otkMessageLimitEnabled') !== 'false';
-        const messageLimitValue = parseInt(localStorage.getItem('otkMessageLimitValue') || '500', 10);
+        const themeSettings = JSON.parse(localStorage.getItem(THEME_SETTINGS_KEY)) || {};
+        const messageLimitEnabled = themeSettings.otkMessageLimitEnabled !== false;
+        const messageLimitValue = parseInt(themeSettings.otkMessageLimitValue || '500', 10);
 
         for (const message of newMessages) {
             const boardForLink = message.board || 'b';
@@ -4035,7 +4039,7 @@ function _populateAttachmentDivWithMedia(
 
             consoleLog(`[BG] Final active threads after message processing: ${activeThreads.length}`, activeThreads);
             consoleLog('[BG] Saving data...');
-            console.log("[BG] messagesByThreadId before save: ", messagesByThreadId);
+            consoleLog("[BG] messagesByThreadId before save: ", messagesByThreadId);
             localStorage.setItem(THREADS_KEY, JSON.stringify(activeThreads));
             for (const threadId of activeThreads) {
                 if (messagesByThreadId[threadId]) {
@@ -4801,7 +4805,7 @@ function _populateAttachmentDivWithMedia(
         position: fixed;
         top: 86px;
         right: 10px;
-        background-color: transparent;
+        background-color: var(--otk-clock-bg-color);
         color: var(--otk-clock-text-color, var(--otk-gui-text-color));
         padding: 5px;
         border: 1px solid var(--otk-clock-border-color);
@@ -4809,8 +4813,51 @@ function _populateAttachmentDivWithMedia(
         z-index: 100001;
         display: none;
         cursor: move;
+        display: flex; /* Use flexbox to align text and icon */
+        align-items: center; /* Center items vertically */
     `;
+
+    const clockTextSpan = document.createElement('span');
+    clockTextSpan.id = 'otk-clock-text';
+    clockElement.appendChild(clockTextSpan);
+
+    const searchIcon = document.createElement('span');
+    searchIcon.id = 'otk-clock-search-icon';
+    searchIcon.innerHTML = '&#128269;'; // Search icon emoji
+    searchIcon.style.cssText = `
+        margin-left: 8px;
+        cursor: pointer;
+    `;
+    clockElement.appendChild(searchIcon);
     document.body.appendChild(clockElement);
+
+    // Timezone Search Container
+    const timezoneSearchContainer = document.createElement('div');
+    timezoneSearchContainer.id = 'otk-timezone-search-container';
+    timezoneSearchContainer.style.cssText = `
+        position: fixed;
+        /* Position will be set dynamically based on clock position */
+        background-color: #333;
+        border: 1px solid #555;
+        border-radius: 4px;
+        z-index: 100002; /* Above clock */
+        display: none;
+        padding: 8px;
+        width: 250px;
+    `;
+    const searchInput = document.createElement('input');
+    searchInput.type = 'text';
+    searchInput.id = 'otk-timezone-search-input';
+    searchInput.placeholder = 'Search for a city/region...';
+    searchInput.style.cssText = 'width: 100%; box-sizing: border-box; margin-bottom: 5px;';
+    timezoneSearchContainer.appendChild(searchInput);
+
+    const searchResultsDiv = document.createElement('div');
+    searchResultsDiv.id = 'otk-timezone-search-results';
+    searchResultsDiv.style.cssText = 'max-height: 200px; overflow-y: auto;';
+    timezoneSearchContainer.appendChild(searchResultsDiv);
+
+    document.body.appendChild(timezoneSearchContainer);
 
     // Make clock draggable
     let isClockDragging = false;
@@ -4874,7 +4921,7 @@ function _populateAttachmentDivWithMedia(
         top: 90px;
         left: 50%;
         transform: translateX(-50%);
-        background-color: var(--otk-clock-bg-color, var(--otk-gui-bg-color));
+        background-color: var(--otk-countdown-bg-color, var(--otk-gui-bg-color));
         padding: 5px;
         border-radius: 5px;
         z-index: 100001;
@@ -4935,6 +4982,27 @@ function _populateAttachmentDivWithMedia(
             countdownElement.style.userSelect = '';
             document.body.style.userSelect = '';
             localStorage.setItem(COUNTDOWN_POSITION_KEY, JSON.stringify({top: countdownElement.style.top, left: countdownElement.style.left}));
+        }
+    });
+
+    // Timezone Search Interaction
+    searchIcon.addEventListener('click', (e) => {
+        e.stopPropagation(); // Prevent the clock's drag from starting
+
+        if (timezoneSearchContainer.style.display === 'block') {
+            timezoneSearchContainer.style.display = 'none';
+        } else {
+            const clockRect = clockElement.getBoundingClientRect();
+            timezoneSearchContainer.style.top = `${clockRect.bottom + 5}px`;
+            timezoneSearchContainer.style.left = `${clockRect.left}px`;
+            timezoneSearchContainer.style.display = 'block';
+        }
+    });
+
+    // Hide search if clicking outside
+    document.addEventListener('click', (e) => {
+        if (!clockElement.contains(e.target) && !timezoneSearchContainer.contains(e.target)) {
+            timezoneSearchContainer.style.display = 'none';
         }
     });
 
@@ -5129,17 +5197,20 @@ function _populateAttachmentDivWithMedia(
     }
 
     function updateClock() {
-        const clockElement = document.getElementById('otk-clock');
-        if (clockElement) {
+    const clockTextElement = document.getElementById('otk-clock-text');
+    if (clockTextElement) {
+        const savedTimezone = localStorage.getItem('otkClockTimezone') || 'America/Chicago';
+        const timeZoneName = savedTimezone.split('/').pop().replace(/_/g, ' ');
+
             const now = new Date();
             const timeString = now.toLocaleTimeString('en-US', {
-                timeZone: 'America/Chicago',
+            timeZone: savedTimezone,
                 hour12: false,
                 hour: '2-digit',
                 minute: '2-digit',
                 second: '2-digit'
             });
-            clockElement.textContent = `${timeString} CDT`;
+        clockTextElement.textContent = `${timeString} ${timeZoneName}`;
         }
     }
 
@@ -5201,7 +5272,7 @@ function handleIntersection(entries, observerInstance) {
             }
 
             if (iframe && iframe.dataset.src && (!iframe.src || iframe.src === 'about:blank')) {
-                console.log('[LazyLoad] Iframe is intersecting, loading src:', iframe.dataset.src);
+                consoleLog('[LazyLoad] Iframe is intersecting, loading src:', iframe.dataset.src);
                 iframe.src = iframe.dataset.src;
             }
             observerInstance.unobserve(wrapper);
@@ -5212,7 +5283,7 @@ function handleIntersection(entries, observerInstance) {
             }
 
             if (iframe && iframe.src && iframe.src !== 'about:blank') {
-                console.log('[LazyLoad] Iframe is no longer intersecting, removing iframe for:', iframe.src);
+                consoleLog('[LazyLoad] Iframe is no longer intersecting, removing iframe for:', iframe.src);
 
                 // For YouTube, try to pause the video before removing
                 if (iframe.contentWindow && iframe.src.includes("youtube.com/embed")) {
@@ -5322,12 +5393,19 @@ function saveThemeSetting(key, value, requiresRerender = false) {
         localStorage.setItem(THEME_SETTINGS_KEY, JSON.stringify(settings));
         consoleLog("Saved theme setting:", key, value);
         if (key.startsWith('otkMsgDepth')) {
-             forceViewerRerenderAfterThemeChange();
+            forceViewerRerenderAfterThemeChange();
         }
     }
 }
 
 async function applyMainTheme() {
+    // If theme settings already exist in localStorage, don't overwrite them with the main theme on page load.
+    // This preserves user's session changes. Main theme is for initial load or after a reset.
+    if (localStorage.getItem(THEME_SETTINGS_KEY)) {
+        consoleLog('[Theme] Active theme settings found in localStorage. Skipping main theme load.');
+        return;
+    }
+
     try {
         const mainThemeSettings = await GM.getValue(MAIN_THEME_KEY);
         if (mainThemeSettings) {
@@ -5342,7 +5420,9 @@ async function applyMainTheme() {
     }
 }
 
-function applyThemeSettings() {
+function applyThemeSettings(options = {}) {
+    const { forceRerender = true } = options; // Default to true to not break existing calls
+
     let settings = {};
     try {
         settings = JSON.parse(localStorage.getItem(THEME_SETTINGS_KEY)) || {};
@@ -5350,6 +5430,7 @@ function applyThemeSettings() {
         consoleError("Error parsing theme settings from localStorage:", e);
     }
     consoleLog("Applying theme settings:", settings);
+    consoleLog("[Clock BG Debug] Applying theme. clockBgColor is:", settings.clockBgColor);
 
     // Helper to update a color input pair (hex text and color swatch)
     const updateColorInputs = (idSuffix, colorValue) => {
@@ -5539,18 +5620,17 @@ function applyThemeSettings() {
         updateColorInputs('blur-icon-bg', settings.blurIconBgColor);
     }
 
-    // Clock Colors
-    if (settings.clockBgColor) {
+// Clock Colors
+    if (settings.hasOwnProperty('clockBgColor') && settings.clockBgColor) {
         document.documentElement.style.setProperty('--otk-clock-bg-color', settings.clockBgColor);
         updateColorInputs('clock-bg', settings.clockBgColor);
-    }
-    if (settings.clockTextColor) {
-        document.documentElement.style.setProperty('--otk-clock-text-color', settings.clockTextColor);
-        updateColorInputs('clock-text', settings.clockTextColor);
-    }
-    if (settings.clockBorderColor) {
-        document.documentElement.style.setProperty('--otk-clock-border-color', settings.clockBorderColor);
-        updateColorInputs('clock-border', settings.clockBorderColor);
+    } else {
+        // If the setting is empty or doesn't exist, remove the inline style property.
+        // This makes the element revert to the color defined in the <style> block's :root.
+        document.documentElement.style.removeProperty('--otk-clock-bg-color');
+        // Update the input to show the computed default color.
+        const defaultColor = getComputedStyle(document.documentElement).getPropertyValue('--otk-clock-bg-color').trim();
+        updateColorInputs('clock-bg', defaultColor);
     }
 
     // GUI Button Colors
@@ -5648,7 +5728,9 @@ function applyThemeSettings() {
         }
     }
 
-    forceViewerRerenderAfterThemeChange();
+    if (forceRerender) {
+        forceViewerRerenderAfterThemeChange();
+    }
 }
 
 
@@ -5905,7 +5987,7 @@ function setupOptionsWindow() {
         localStorage.setItem(DEBUG_MODE_KEY, DEBUG_MODE.toString());
         consoleLog(`Debug mode ${DEBUG_MODE ? 'enabled' : 'disabled'}.`);
         if (DEBUG_MODE) {
-             console.log('[OTK Tracker]', `Debug mode explicitly enabled via UI.`);
+             consoleLog('[OTK Tracker]', `Debug mode explicitly enabled via UI.`);
         }
     });
 
@@ -6037,21 +6119,21 @@ function setupOptionsWindow() {
     messageLimitCheckbox.type = 'checkbox';
     messageLimitCheckbox.id = 'otk-message-limit-checkbox';
     messageLimitCheckbox.style.cssText = "height: 16px; width: 16px;";
-    messageLimitCheckbox.checked = localStorage.getItem('otkMessageLimitEnabled') !== 'false';
+    const initialThemeSettings = JSON.parse(localStorage.getItem(THEME_SETTINGS_KEY)) || {};
+    messageLimitCheckbox.checked = initialThemeSettings.otkMessageLimitEnabled !== false;
 
     const messageLimitInput = document.createElement('input');
     messageLimitInput.type = 'number';
     messageLimitInput.id = 'otk-message-limit-input';
     messageLimitInput.min = '1';
     messageLimitInput.style.cssText = "width: 70px; height: 25px; box-sizing: border-box; font-size: 12px; text-align: right;";
-    messageLimitInput.value = localStorage.getItem('otkMessageLimitValue') || '500';
+    messageLimitInput.value = initialThemeSettings.otkMessageLimitValue || '500';
     messageLimitInput.disabled = !messageLimitCheckbox.checked;
 
     messageLimitCheckbox.addEventListener('change', () => {
         const isEnabled = messageLimitCheckbox.checked;
         saveThemeSetting('otkMessageLimitEnabled', isEnabled, true);
         messageLimitInput.disabled = !isEnabled;
-        forceViewerRerenderAfterThemeChange();
     });
 
     messageLimitInput.addEventListener('change', () => {
@@ -6300,7 +6382,9 @@ function setupOptionsWindow() {
         const updateSetting = (value, fromColorPicker = false) => { // Added fromColorPicker flag
             let processedValue = value.trim();
             if (options.inputType === 'color') {
-                if (!/^#[0-9A-F]{6}$/i.test(processedValue) && !/^#[0-9A-F]{3}$/i.test(processedValue)) {
+                if (processedValue === '') {
+                    // Allow empty string to clear the color
+                } else if (!/^#[0-9A-F]{6}$/i.test(processedValue) && !/^#[0-9A-F]{3}$/i.test(processedValue)) {
                     consoleWarn(`Invalid hex color for ${options.labelText}:`, processedValue);
                     // Restore previous valid values if possible, or default
                     let currentSaved = options.defaultValue;
@@ -6340,7 +6424,7 @@ function setupOptionsWindow() {
                 consoleLog(`[Debug UpdateSetting] Applying to ${options.cssVariable}: ${processedValue} (StorageKey: ${options.storageKey})`);
             }
 
-            document.documentElement.style.setProperty(options.cssVariable, processedValue);
+            document.documentElement.style.setProperty(options.cssVariable, processedValue || 'transparent');
             saveThemeSetting(options.storageKey, processedValue);
             // If this is the cog icon color, update it directly as it's not part of applyThemeSettings' normal flow for self-update
             if (options.storageKey === 'cogIconColor') {
@@ -6436,10 +6520,11 @@ function setupOptionsWindow() {
     themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Stats Dash:", storageKey: 'statsDashColor', cssVariable: '--otk-stats-dash-color', defaultValue: '#e6e6e6', inputType: 'color', idSuffix: 'stats-dash' }));
     themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Background Updates Stats Text:", storageKey: 'backgroundUpdatesStatsTextColor', cssVariable: '--otk-background-updates-stats-text-color', defaultValue: '#FFD700', inputType: 'color', idSuffix: 'background-updates-stats-text' }));
     themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Cog Icon:", storageKey: 'cogIconColor', cssVariable: '--otk-cog-icon-color', defaultValue: '#e6e6e6', inputType: 'color', idSuffix: 'cog-icon' }));
+    themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Countdown Background:", storageKey: 'countdownBgColor', cssVariable: '--otk-countdown-bg-color', defaultValue: '#181818', inputType: 'color', idSuffix: 'countdown-bg' }));
     themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Countdown Label Text:", storageKey: 'countdownLabelTextColor', cssVariable: '--otk-countdown-label-text-color', defaultValue: '#ff8040', inputType: 'color', idSuffix: 'countdown-label-text' }));
     themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Countdown Timer Text:", storageKey: 'countdownTimerTextColor', cssVariable: '--otk-countdown-timer-text-color', defaultValue: '#ff8040', inputType: 'color', idSuffix: 'countdown-timer-text' }));
     themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Separator:", storageKey: 'separatorColor', cssVariable: '--otk-separator-color', defaultValue: '#e6e6e6', inputType: 'color', idSuffix: 'separator' }));
-    themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Clock Background:", storageKey: 'clockBgColor', cssVariable: '--otk-clock-bg-color', defaultValue: '#181818', inputType: 'color', idSuffix: 'clock-bg' }));
+    themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Clock Background:", storageKey: 'clockBgColor', cssVariable: '--otk-clock-bg-color', defaultValue: '', inputType: 'color', idSuffix: 'clock-bg' }));
     themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Clock Text:", storageKey: 'clockTextColor', cssVariable: '--otk-clock-text-color', defaultValue: '#e6e6e6', inputType: 'color', idSuffix: 'clock-text' }));
     themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Clock Border:", storageKey: 'clockBorderColor', cssVariable: '--otk-clock-border-color', defaultValue: '#ff8040', inputType: 'color', idSuffix: 'clock-border' }));
 
@@ -6457,10 +6542,10 @@ function setupOptionsWindow() {
     // themeOptionsContainer.appendChild(createDivider()); // Removed divider
 
     // --- GUI Background Section ---
-    const guiBgImageSectionHeading = createSectionHeading('GUI Background');
-    guiBgImageSectionHeading.style.marginTop = "22px";
-    guiBgImageSectionHeading.style.marginBottom = "18px";
-    generalSettingsSection.appendChild(guiBgImageSectionHeading);
+    const guiBackgroundSubHeading = document.createElement('h6');
+    guiBackgroundSubHeading.textContent = "GUI Background";
+    guiBackgroundSubHeading.style.cssText = "margin-top: 20px; margin-bottom: 15px; color: #cccccc; font-size: 12px; font-weight: bold; text-align: left;";
+    themeOptionsContainer.appendChild(guiBackgroundSubHeading);
 
     function createTextInputRow(options) {
         const group = document.createElement('div');
@@ -6478,10 +6563,7 @@ function setupOptionsWindow() {
         input.style.cssText = "width: 100%; height: 25px; box-sizing: border-box; font-size: 12px; text-align: right;";
         input.value = (JSON.parse(localStorage.getItem(THEME_SETTINGS_KEY)) || {})[options.storageKey] || '';
         input.addEventListener('change', () => {
-            let settings = JSON.parse(localStorage.getItem(THEME_SETTINGS_KEY)) || {};
-            settings[options.storageKey] = input.value;
-            localStorage.setItem(THEME_SETTINGS_KEY, JSON.stringify(settings));
-            applyThemeSettings();
+            saveThemeSetting(options.storageKey, input.value, true);
         });
         controlsWrapperDiv.appendChild(input);
         group.appendChild(label);
@@ -6489,7 +6571,7 @@ function setupOptionsWindow() {
         return group;
     }
 
-    generalSettingsSection.appendChild(createTextInputRow({
+    themeOptionsContainer.appendChild(createTextInputRow({
         labelText: 'Background Image URL:',
         storageKey: 'guiBackgroundImageUrl',
         idSuffix: 'gui-bg-image-url',
@@ -6514,10 +6596,7 @@ function setupOptionsWindow() {
         });
         select.value = (JSON.parse(localStorage.getItem(THEME_SETTINGS_KEY)) || {})[options.storageKey] || options.defaultValue;
         select.addEventListener('change', () => {
-            let settings = JSON.parse(localStorage.getItem(THEME_SETTINGS_KEY)) || {};
-            settings[options.storageKey] = select.value;
-            localStorage.setItem(THEME_SETTINGS_KEY, JSON.stringify(settings));
-            applyThemeSettings();
+            saveThemeSetting(options.storageKey, select.value, true);
         });
         controlsWrapperDiv.appendChild(select);
         group.appendChild(label);
@@ -6525,19 +6604,19 @@ function setupOptionsWindow() {
         return group;
     }
 
-    generalSettingsSection.appendChild(createDropdownRow({
+    themeOptionsContainer.appendChild(createDropdownRow({
         labelText: 'Background Size:',
         storageKey: 'guiBgSize',
         options: ['auto', 'cover', 'contain'],
         defaultValue: 'cover'
     }));
-    generalSettingsSection.appendChild(createDropdownRow({
+    themeOptionsContainer.appendChild(createDropdownRow({
         labelText: 'Background Repeat:',
         storageKey: 'guiBgRepeat',
         options: ['no-repeat', 'repeat', 'repeat-x', 'repeat-y'],
         defaultValue: 'no-repeat'
     }));
-    generalSettingsSection.appendChild(createDropdownRow({
+    themeOptionsContainer.appendChild(createDropdownRow({
         labelText: 'Background Position:',
         storageKey: 'guiBgPosition',
         options: ['center', 'top', 'bottom', 'left', 'right'],
@@ -7157,6 +7236,7 @@ function setupOptionsWindow() {
             { storageKey: 'viewerQuote2plusHeaderBorderColor', cssVariable: '--otk-viewer-quote2plus-header-border-color', defaultValue: '#000000', inputType: 'color', idSuffix: 'viewer-quote2plus-border' },
             { storageKey: 'cogIconColor', cssVariable: '--otk-cog-icon-color', defaultValue: '#e6e6e6', inputType: 'color', idSuffix: 'cog-icon' },
             { storageKey: 'disableBgFontColor', cssVariable: '--otk-disable-bg-font-color', defaultValue: '#ff8040', inputType: 'color', idSuffix: 'disable-bg-font' },
+            { storageKey: 'countdownBgColor', cssVariable: '--otk-countdown-bg-color', defaultValue: '#181818', inputType: 'color', idSuffix: 'countdown-bg' },
             { storageKey: 'countdownLabelTextColor', cssVariable: '--otk-countdown-label-text-color', defaultValue: '#ff8040', inputType: 'color', idSuffix: 'countdown-label-text' },
             { storageKey: 'countdownTimerTextColor', cssVariable: '--otk-countdown-timer-text-color', defaultValue: '#ff8040', inputType: 'color', idSuffix: 'countdown-timer-text' },
             { storageKey: 'separatorColor', cssVariable: '--otk-separator-color', defaultValue: '#e6e6e6', inputType: 'color', idSuffix: 'separator' },
@@ -7268,10 +7348,10 @@ function setupOptionsWindow() {
     if (cogIcon) {
         cogIcon.addEventListener('click', () => {
             optionsWindow.style.display = optionsWindow.style.display === 'none' ? 'flex' : 'none';
-            consoleLog("Toggled options window visibility to:", optionsWindow.style.display);
+                    consoleLog("Toggled options window visibility to:", optionsWindow.style.display);
         });
     } else {
-        consoleError("Cog icon not found for options window toggle.");
+                consoleError("Cog icon not found for options window toggle.");
     }
 
     closeButton.addEventListener('click', () => {
@@ -7382,6 +7462,7 @@ async function main() {
             --otk-clock-bg-color: #181818;
             --otk-clock-text-color: #e6e6e6;
             --otk-clock-border-color: #ff8040;
+            --otk-countdown-bg-color: #181818;
             --otk-gui-bg-color: #181818;
             --otk-gui-bg-color: #181818;
             --otk-gui-text-color: #e6e6e6; /* General text in the main GUI bar */
@@ -7591,6 +7672,12 @@ async function main() {
             display: none;
         }
 
+        #otk-clock-search-icon {
+            display: none;
+        }
+        #otk-clock:hover #otk-clock-search-icon {
+            display: inline-block;
+        }
         .${ANCHORED_MESSAGE_CLASS} {
             background-color: var(--otk-anchor-highlight-bg-color) !important;
             border: 1px solid var(--otk-anchor-highlight-border-color) !important;
@@ -7607,6 +7694,8 @@ async function main() {
     await applyMainTheme();
     setupOptionsWindow(); // Call to create the options window shell and event listeners
     applyThemeSettings(); // Apply any saved theme settings
+    await fetchTimezones();
+    setupTimezoneSearch();
 
     consoleLog('Attempting to call setupLoadingScreen...');
     setupLoadingScreen(); // Create loading screen elements early
@@ -7623,9 +7712,10 @@ async function main() {
             consoleLog("messagesByThreadId after load:", messagesByThreadId);
 
             // Trim messages according to limit to reduce memory usage
-            const messageLimitEnabled = localStorage.getItem('otkMessageLimitEnabled') !== 'false';
+            const themeSettings = JSON.parse(localStorage.getItem(THEME_SETTINGS_KEY)) || {};
+            const messageLimitEnabled = themeSettings.otkMessageLimitEnabled !== false;
             if (messageLimitEnabled) {
-                const messageLimitValue = parseInt(localStorage.getItem('otkMessageLimitValue') || '500', 10);
+                const messageLimitValue = parseInt(themeSettings.otkMessageLimitValue || '500', 10);
                 let allMessages = [];
                 for (const threadId in messagesByThreadId) {
                     allMessages.push(...messagesByThreadId[threadId]);
@@ -7828,5 +7918,210 @@ async function main() {
         const reportWindow = window.open("", "Memory Report", "width=600,height=400");
         reportWindow.document.write('<pre>' + report + '</pre>');
     }
+
+async function fetchTimezones() {
+    return new Promise((resolve, reject) => {
+        GM_xmlhttpRequest({
+            method: "GET",
+            url: 'https://timeapi.io/api/TimeZone/AvailableTimezones',
+            onload: function(response) {
+                if (response.status === 200) {
+                    allTimezones = JSON.parse(response.responseText);
+                    consoleLog(`Successfully fetched ${allTimezones.length} timezones from timeapi.io.`);
+                    resolve();
+                } else {
+                    consoleError(`Failed to fetch timezones: ${response.status}`);
+                    allTimezones = ['America/New_York', 'Europe/London', 'Asia/Tokyo', 'Australia/Sydney'];
+                    resolve(); // Resolve with fallback data
+                }
+            },
+            onerror: function(error) {
+                consoleError('Error fetching timezones:', error);
+                allTimezones = ['America/New_York', 'Europe/London', 'Asia/Tokyo', 'Australia/Sydney'];
+                resolve(); // Resolve with fallback data
+            }
+        });
+    });
+}
+
+const clockCityAliases = {
+  // US Cities / States
+  "new york": "America/New_York", "nyc": "America/New_York", "new york city": "America/New_York",
+  "los angeles": "America/Los_Angeles", "la": "America/Los_Angeles",
+  "chicago": "America/Chicago",
+  "houston": "America/Chicago",
+  "phoenix": "America/Phoenix",
+  "philadelphia": "America/New_York",
+  "san antonio": "America/Chicago",
+  "san diego": "America/Los_Angeles",
+  "dallas": "America/Chicago",
+  "san jose": "America/Los_Angeles",
+  "austin": "America/Chicago",
+  "jacksonville": "America/New_York",
+  "san francisco": "America/Los_Angeles", "sf": "America/Los_Angeles",
+  "indianapolis": "America/Indiana/Indianapolis",
+  "columbus": "America/New_York",
+  "fort worth": "America/Chicago",
+  "charlotte": "America/New_York",
+  "seattle": "America/Los_Angeles",
+  "denver": "America/Denver",
+  "washington dc": "America/New_York",
+  "boston": "America/New_York",
+  "detroit": "America/Detroit",
+  "nashville": "America/Chicago",
+  "memphis": "America/Chicago",
+  "portland": "America/Los_Angeles",
+  "oklahoma city": "America/Chicago",
+  "las vegas": "America/Los_Angeles",
+  "louisville": "America/Kentucky/Louisville",
+  "baltimore": "America/New_York",
+  "milwaukee": "America/Chicago",
+  "albuquerque": "America/Denver",
+  "tucson": "America/Phoenix",
+  "fresno": "America/Los_Angeles",
+  "sacramento": "America/Los_Angeles",
+  "kansas city": "America/Chicago",
+  "atlanta": "America/New_York",
+  "miami": "America/New_York",
+  "texas": "America/Chicago",
+  "florida": "America/New_York",
+  "california": "America/Los_Angeles",
+  "arizona": "America/Phoenix",
+  "illinois": "America/Chicago",
+  "pennsylvania": "America/New_York",
+  "ohio": "America/New_York",
+  "michigan": "America/Detroit",
+  "georgia": "America/New_York",
+  "north carolina": "America/New_York",
+  "virginia": "America/New_York",
+  "new jersey": "America/New_York",
+  "washington": "America/Los_Angeles",
+  "massachusetts": "America/New_York",
+  "indiana": "America/Indiana/Indianapolis",
+  "tennessee": "America/Chicago",
+  "missouri": "America/Chicago",
+  "maryland": "America/New_York",
+  "wisconsin": "America/Chicago",
+  "colorado": "America/Denver",
+  "minnesota": "America/Chicago",
+  "south carolina": "America/New_York",
+  "alabama": "America/Chicago",
+  "louisiana": "America/Chicago",
+  "kentucky": "America/New_York",
+  "oregon": "America/Los_Angeles",
+  "oklahoma": "America/Chicago",
+  "connecticut": "America/New_York",
+  "utah": "America/Denver",
+  "iowa": "America/Chicago",
+  "nevada": "America/Los_Angeles",
+  "arkansas": "America/Chicago",
+  "mississippi": "America/Chicago",
+  "kansas": "America/Chicago",
+  "new mexico": "America/Denver",
+  "nebraska": "America/Chicago",
+  "west virginia": "America/New_York",
+  "idaho": "America/Denver",
+  "hawaii": "Pacific/Honolulu",
+  "new hampshire": "America/New_York",
+  "maine": "America/New_York",
+  "montana": "America/Denver",
+  "rhode island": "America/New_York",
+  "delaware": "America/New_York",
+  "south dakota": "America/Chicago",
+  "north dakota": "America/Chicago",
+  "alaska": "America/Anchorage",
+  "vermont": "America/New_York",
+  "wyoming": "America/Denver",
+  // World Cities
+  "london": "Europe/London",
+  "paris": "Europe/Paris",
+  "berlin": "Europe/Berlin",
+  "moscow": "Europe/Moscow",
+  "tokyo": "Asia/Tokyo",
+  "beijing": "Asia/Shanghai",
+  "shanghai": "Asia/Shanghai",
+  "hong kong": "Asia/Hong_Kong",
+  "singapore": "Asia/Singapore",
+  "seoul": "Asia/Seoul",
+  "sydney": "Australia/Sydney",
+  "melbourne": "Australia/Melbourne",
+  "toronto": "America/Toronto",
+  "vancouver": "America/Vancouver",
+  "mexico city": "America/Mexico_City",
+  "sao paulo": "America/Sao_Paulo",
+  "buenos aires": "America/Argentina/Buenos_Aires",
+  "cairo": "Africa/Cairo",
+  "dubai": "Asia/Dubai",
+  "mumbai": "Asia/Kolkata",
+  "delhi": "Asia/Kolkata",
+};
+
+function setupTimezoneSearch() {
+    const searchInput = document.getElementById('otk-timezone-search-input');
+    const searchResultsDiv = document.getElementById('otk-timezone-search-results');
+    const addedZones = new Set();
+
+    function addZoneItem(zoneName) {
+        if (addedZones.has(zoneName)) {
+            return;
+        }
+        addedZones.add(zoneName);
+
+        const resultDiv = document.createElement('div');
+        resultDiv.textContent = zoneName.replace(/_/g, ' ');
+        resultDiv.dataset.timezone = zoneName;
+        resultDiv.style.cssText = `
+            padding: 4px;
+            cursor: pointer;
+        `;
+        resultDiv.addEventListener('mouseenter', () => {
+            resultDiv.style.backgroundColor = '#555';
+        });
+        resultDiv.addEventListener('mouseleave', () => {
+            resultDiv.style.backgroundColor = '';
+        });
+        resultDiv.addEventListener('click', () => {
+            const selectedTimezone = resultDiv.dataset.timezone;
+            localStorage.setItem('otkClockTimezone', selectedTimezone);
+            updateClock(); // Update immediately
+            document.getElementById('otk-timezone-search-container').style.display = 'none'; // Hide search
+            searchInput.value = '';
+            searchResultsDiv.innerHTML = '';
+        });
+        searchResultsDiv.appendChild(resultDiv);
+    }
+
+    searchInput.addEventListener('input', () => {
+        consoleLog(`[TZ Search] Input event fired. Value: "${searchInput.value}"`);
+        const raw = searchInput.value.trim().toLowerCase();
+        const val = raw.replace(/\s+/g, "_");
+        consoleLog(`[TZ Search] Normalized search query: raw='${raw}', val='${val}'`);
+
+        searchResultsDiv.innerHTML = ''; // Clear previous results
+        addedZones.clear();
+
+        if (raw.length < 2) {
+            consoleLog('[TZ Search] Query too short. Aborting search.');
+            return;
+        }
+
+        consoleLog(`[TZ Search] Checking aliases for '${raw}'...`);
+        if (clockCityAliases[raw]) {
+            const aliasedZone = clockCityAliases[raw];
+            consoleLog(`[TZ Search] Alias found: '${raw}' -> '${aliasedZone}'. Adding to results.`);
+            addZoneItem(aliasedZone);
+        }
+
+        consoleLog(`[TZ Search] Filtering ${allTimezones.length} timezones with query '${val}'...`);
+        const filteredTimezones = allTimezones.filter(tz =>
+            tz.toLowerCase().includes(val)
+        );
+        consoleLog(`[TZ Search] Found ${filteredTimezones.length} matches.`);
+
+        filteredTimezones.slice(0, 50).forEach(tz => {
+            addZoneItem(tz);
+        });
+    });
+}
 
 })();
