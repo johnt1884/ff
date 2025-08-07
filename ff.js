@@ -4837,7 +4837,7 @@ function _populateAttachmentDivWithMedia(
     timezoneSearchContainer.style.cssText = `
         position: fixed;
         /* Position will be set dynamically based on clock position */
-        background-color: #333;
+        background-color: var(--otk-clock-search-bg-color, #333);
         border: 1px solid #555;
         border-radius: 4px;
         z-index: 100002; /* Above clock */
@@ -5631,6 +5631,14 @@ function applyThemeSettings(options = {}) {
         // Update the input to show the computed default color.
         const defaultColor = getComputedStyle(document.documentElement).getPropertyValue('--otk-clock-bg-color').trim();
         updateColorInputs('clock-bg', defaultColor);
+    }
+    if (settings.clockSearchBgColor) {
+        document.documentElement.style.setProperty('--otk-clock-search-bg-color', settings.clockSearchBgColor);
+        updateColorInputs('clock-search-bg', settings.clockSearchBgColor);
+    }
+    if (settings.clockSearchTextColor) {
+        document.documentElement.style.setProperty('--otk-clock-search-text-color', settings.clockSearchTextColor);
+        updateColorInputs('clock-search-text', settings.clockSearchTextColor);
     }
 
     // GUI Button Colors
@@ -6527,6 +6535,8 @@ function setupOptionsWindow() {
     themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Clock Background:", storageKey: 'clockBgColor', cssVariable: '--otk-clock-bg-color', defaultValue: '', inputType: 'color', idSuffix: 'clock-bg' }));
     themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Clock Text:", storageKey: 'clockTextColor', cssVariable: '--otk-clock-text-color', defaultValue: '#e6e6e6', inputType: 'color', idSuffix: 'clock-text' }));
     themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Clock Border:", storageKey: 'clockBorderColor', cssVariable: '--otk-clock-border-color', defaultValue: '#ff8040', inputType: 'color', idSuffix: 'clock-border' }));
+    themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Clock Search Background:", storageKey: 'clockSearchBgColor', cssVariable: '--otk-clock-search-bg-color', defaultValue: '#333', inputType: 'color', idSuffix: 'clock-search-bg' }));
+    themeOptionsContainer.appendChild(createThemeOptionRow({ labelText: "Clock Search Text:", storageKey: 'clockSearchTextColor', cssVariable: '--otk-clock-search-text-color', defaultValue: '#e6e6e6', inputType: 'color', idSuffix: 'clock-search-text' }));
 
     // Sub-section for GUI Buttons
     const guiButtonsSubHeading = document.createElement('h6');
@@ -7272,7 +7282,9 @@ function setupOptionsWindow() {
             // Clock Colours
             { storageKey: 'clockBgColor', cssVariable: '--otk-clock-bg-color', defaultValue: '#181818', inputType: 'color', idSuffix: 'clock-bg' },
             { storageKey: 'clockTextColor', cssVariable: '--otk-clock-text-color', defaultValue: '#e6e6e6', inputType: 'color', idSuffix: 'clock-text' },
-            { storageKey: 'clockBorderColor', cssVariable: '--otk-clock-border-color', defaultValue: '#ff8040', inputType: 'color', idSuffix: 'clock-border' }
+            { storageKey: 'clockBorderColor', cssVariable: '--otk-clock-border-color', defaultValue: '#ff8040', inputType: 'color', idSuffix: 'clock-border' },
+            { storageKey: 'clockSearchBgColor', cssVariable: '--otk-clock-search-bg-color', defaultValue: '#333', inputType: 'color', idSuffix: 'clock-search-bg' },
+            { storageKey: 'clockSearchTextColor', cssVariable: '--otk-clock-search-text-color', defaultValue: '#e6e6e6', inputType: 'color', idSuffix: 'clock-search-text' }
         ];
     }
 
@@ -7462,6 +7474,8 @@ async function main() {
             --otk-clock-bg-color: #181818;
             --otk-clock-text-color: #e6e6e6;
             --otk-clock-border-color: #ff8040;
+            --otk-clock-search-bg-color: #333;
+            --otk-clock-search-text-color: #e6e6e6;
             --otk-countdown-bg-color: #181818;
             --otk-gui-bg-color: #181818;
             --otk-gui-bg-color: #181818;
@@ -7945,115 +7959,145 @@ async function fetchTimezones() {
 }
 
 const clockCityAliases = {
-  // US Cities / States
-  "new york": "America/New_York", "nyc": "America/New_York", "new york city": "America/New_York",
-  "los angeles": "America/Los_Angeles", "la": "America/Los_Angeles",
-  "chicago": "America/Chicago",
-  "houston": "America/Chicago",
-  "phoenix": "America/Phoenix",
-  "philadelphia": "America/New_York",
-  "san antonio": "America/Chicago",
-  "san diego": "America/Los_Angeles",
-  "dallas": "America/Chicago",
-  "san jose": "America/Los_Angeles",
-  "austin": "America/Chicago",
-  "jacksonville": "America/New_York",
-  "san francisco": "America/Los_Angeles", "sf": "America/Los_Angeles",
-  "indianapolis": "America/Indiana/Indianapolis",
-  "columbus": "America/New_York",
-  "fort worth": "America/Chicago",
-  "charlotte": "America/New_York",
-  "seattle": "America/Los_Angeles",
-  "denver": "America/Denver",
-  "washington dc": "America/New_York",
-  "boston": "America/New_York",
-  "detroit": "America/Detroit",
-  "nashville": "America/Chicago",
-  "memphis": "America/Chicago",
-  "portland": "America/Los_Angeles",
-  "oklahoma city": "America/Chicago",
-  "las vegas": "America/Los_Angeles",
-  "louisville": "America/Kentucky/Louisville",
-  "baltimore": "America/New_York",
-  "milwaukee": "America/Chicago",
-  "albuquerque": "America/Denver",
-  "tucson": "America/Phoenix",
-  "fresno": "America/Los_Angeles",
-  "sacramento": "America/Los_Angeles",
-  "kansas city": "America/Chicago",
-  "atlanta": "America/New_York",
-  "miami": "America/New_York",
-  "texas": "America/Chicago",
-  "florida": "America/New_York",
-  "california": "America/Los_Angeles",
-  "arizona": "America/Phoenix",
-  "illinois": "America/Chicago",
-  "pennsylvania": "America/New_York",
-  "ohio": "America/New_York",
-  "michigan": "America/Detroit",
-  "georgia": "America/New_York",
-  "north carolina": "America/New_York",
-  "virginia": "America/New_York",
-  "new jersey": "America/New_York",
-  "washington": "America/Los_Angeles",
-  "massachusetts": "America/New_York",
-  "indiana": "America/Indiana/Indianapolis",
-  "tennessee": "America/Chicago",
-  "missouri": "America/Chicago",
-  "maryland": "America/New_York",
-  "wisconsin": "America/Chicago",
-  "colorado": "America/Denver",
-  "minnesota": "America/Chicago",
-  "south carolina": "America/New_York",
-  "alabama": "America/Chicago",
-  "louisiana": "America/Chicago",
-  "kentucky": "America/New_York",
-  "oregon": "America/Los_Angeles",
-  "oklahoma": "America/Chicago",
-  "connecticut": "America/New_York",
-  "utah": "America/Denver",
-  "iowa": "America/Chicago",
-  "nevada": "America/Los_Angeles",
-  "arkansas": "America/Chicago",
-  "mississippi": "America/Chicago",
-  "kansas": "America/Chicago",
-  "new mexico": "America/Denver",
-  "nebraska": "America/Chicago",
-  "west virginia": "America/New_York",
-  "idaho": "America/Denver",
-  "hawaii": "Pacific/Honolulu",
-  "new hampshire": "America/New_York",
-  "maine": "America/New_York",
-  "montana": "America/Denver",
-  "rhode island": "America/New_York",
-  "delaware": "America/New_York",
-  "south dakota": "America/Chicago",
-  "north dakota": "America/Chicago",
-  "alaska": "America/Anchorage",
-  "vermont": "America/New_York",
-  "wyoming": "America/Denver",
-  // World Cities
-  "london": "Europe/London",
-  "paris": "Europe/Paris",
-  "berlin": "Europe/Berlin",
-  "moscow": "Europe/Moscow",
-  "tokyo": "Asia/Tokyo",
-  "beijing": "Asia/Shanghai",
-  "shanghai": "Asia/Shanghai",
-  "hong kong": "Asia/Hong_Kong",
-  "singapore": "Asia/Singapore",
-  "seoul": "Asia/Seoul",
-  "sydney": "Australia/Sydney",
-  "melbourne": "Australia/Melbourne",
-  "toronto": "America/Toronto",
-  "vancouver": "America/Vancouver",
-  "mexico city": "America/Mexico_City",
-  "sao paulo": "America/Sao_Paulo",
-  "buenos aires": "America/Argentina/Buenos_Aires",
-  "cairo": "Africa/Cairo",
-  "dubai": "Asia/Dubai",
-  "mumbai": "Asia/Kolkata",
-  "delhi": "Asia/Kolkata",
+    // US Cities / States
+    "new york": "America/New_York", "nyc": "America/New_York", "new york city": "America/New_York", "eastern": "America/New_York", "et": "America/New_York",
+    "los angeles": "America/Los_Angeles", "la": "America/Los_Angeles", "pacific": "America/Los_Angeles", "pt": "America/Los_Angeles",
+    "chicago": "America/Chicago", "central": "America/Chicago", "ct": "America/Chicago",
+    "denver": "America/Denver", "mountain": "America/Denver", "mt": "America/Denver",
+    "phoenix": "America/Phoenix", "arizona": "America/Phoenix",
+    "anchorage": "America/Anchorage", "alaska": "America/Anchorage",
+    "honolulu": "Pacific/Honolulu", "hawaii": "Pacific/Honolulu",
+    "houston": "America/Chicago",
+    "philadelphia": "America/New_York",
+    "san antonio": "America/Chicago",
+    "san diego": "America/Los_Angeles",
+    "dallas": "America/Chicago",
+    "san jose": "America/Los_Angeles",
+    "austin": "America/Chicago",
+    "jacksonville": "America/New_York",
+    "san francisco": "America/Los_Angeles", "sf": "America/Los_Angeles",
+    "indianapolis": "America/Indiana/Indianapolis",
+    "columbus": "America/New_York",
+    "fort worth": "America/Chicago",
+    "charlotte": "America/New_York",
+    "seattle": "America/Los_Angeles",
+    "washington dc": "America/New_York", "dc": "America/New_York",
+    "boston": "America/New_York",
+    "detroit": "America/Detroit",
+    "nashville": "America/Chicago",
+    "memphis": "America/Chicago",
+    "portland": "America/Los_Angeles",
+    "oklahoma city": "America/Chicago",
+    "las vegas": "America/Los_Angeles",
+    "louisville": "America/Kentucky/Louisville",
+    "baltimore": "America/New_York",
+    "milwaukee": "America/Chicago",
+    "albuquerque": "America/Denver",
+    "tucson": "America/Phoenix",
+    "fresno": "America/Los_Angeles",
+    "sacramento": "America/Los_Angeles",
+    "kansas city": "America/Chicago",
+    "atlanta": "America/New_York",
+    "miami": "America/New_York",
+    "texas": "America/Chicago",
+    "florida": "America/New_York",
+    "california": "America/Los_Angeles",
+    "illinois": "America/Chicago",
+    "pennsylvania": "America/New_York",
+    "ohio": "America/New_York",
+    "michigan": "America/Detroit",
+    "georgia": "America/New_York",
+    "north carolina": "America/New_York",
+    "virginia": "America/New_York",
+    "new jersey": "America/New_York",
+    "washington": "America/Los_Angeles",
+    "massachusetts": "America/New_York",
+    "indiana": "America/Indiana/Indianapolis",
+    "tennessee": "America/Chicago",
+    "missouri": "America/Chicago",
+    "maryland": "America/New_York",
+    "wisconsin": "America/Chicago",
+    "colorado": "America/Denver",
+    "minnesota": "America/Chicago",
+    "south carolina": "America/New_York",
+    "alabama": "America/Chicago",
+    "louisiana": "America/Chicago",
+    "kentucky": "America/New_York",
+    "oregon": "America/Los_Angeles",
+    "oklahoma": "America/Chicago",
+    "connecticut": "America/New_York",
+    "utah": "America/Denver",
+    "iowa": "America/Chicago",
+    "nevada": "America/Los_Angeles",
+    "arkansas": "America/Chicago",
+    "mississippi": "America/Chicago",
+    "kansas": "America/Chicago",
+    "new mexico": "America/Denver",
+    "nebraska": "America/Chicago",
+    "west virginia": "America/New_York",
+    "idaho": "America/Denver",
+    "new hampshire": "America/New_York",
+    "maine": "America/New_York",
+    "montana": "America/Denver",
+    "rhode island": "America/New_York",
+    "delaware": "America/New_York",
+    "south dakota": "America/Chicago",
+    "north dakota": "America/Chicago",
+    "vermont": "America/New_York",
+    "wyoming": "America/Denver",
+    // World Cities & Regions
+    "london": "Europe/London", "uk": "Europe/London", "gmt": "Europe/London",
+    "paris": "Europe/Paris", "france": "Europe/Paris",
+    "berlin": "Europe/Berlin", "germany": "Europe/Berlin", "cet": "Europe/Berlin",
+    "moscow": "Europe/Moscow", "russia": "Europe/Moscow",
+    "tokyo": "Asia/Tokyo", "japan": "Asia/Tokyo", "jst": "Asia/Tokyo",
+    "beijing": "Asia/Shanghai", "shanghai": "Asia/Shanghai", "china": "Asia/Shanghai",
+    "hong kong": "Asia/Hong_Kong",
+    "singapore": "Asia/Singapore",
+    "seoul": "Asia/Seoul", "korea": "Asia/Seoul",
+    "sydney": "Australia/Sydney", "melbourne": "Australia/Melbourne", "australia": "Australia/Sydney", "aest": "Australia/Sydney",
+    "toronto": "America/Toronto", "montreal": "America/Toronto", "canada eastern": "America/Toronto",
+    "vancouver": "America/Vancouver", "canada pacific": "America/Vancouver",
+    "mexico city": "America/Mexico_City", "mexico": "America/Mexico_City",
+    "sao paulo": "America/Sao_Paulo", "rio de janeiro": "America/Sao_Paulo", "brazil": "America/Sao_Paulo",
+    "buenos aires": "America/Argentina/Buenos_Aires", "argentina": "America/Argentina/Buenos_Aires",
+    "cairo": "Africa/Cairo", "egypt": "Africa/Cairo",
+    "dubai": "Asia/Dubai", "uae": "Asia/Dubai",
+    "mumbai": "Asia/Kolkata", "delhi": "Asia/Kolkata", "india": "Asia/Kolkata", "ist": "Asia/Kolkata",
+    "rome": "Europe/Rome", "italy": "Europe/Rome",
+    "madrid": "Europe/Madrid", "spain": "Europe/Madrid",
+    "amsterdam": "Europe/Amsterdam", "netherlands": "Europe/Amsterdam",
+    "brussels": "Europe/Brussels", "belgium": "Europe/Brussels",
+    "zurich": "Europe/Zurich", "switzerland": "Europe/Zurich",
+    "stockholm": "Europe/Stockholm", "sweden": "Europe/Stockholm",
+    "oslo": "Europe/Oslo", "norway": "Europe/Oslo",
+    "copenhagen": "Europe/Copenhagen", "denmark": "Europe/Copenhagen",
+    "helsinki": "Europe/Helsinki", "finland": "Europe/Helsinki",
+    "athens": "Europe/Athens", "greece": "Europe/Athens",
+    "istanbul": "Europe/Istanbul", "turkey": "Europe/Istanbul",
+    "kiev": "Europe/Kiev", "ukraine": "Europe/Kiev",
+    "warsaw": "Europe/Warsaw", "poland": "Europe/Warsaw",
+    "dublin": "Europe/Dublin", "ireland": "Europe/Dublin",
+    "lisbon": "Europe/Lisbon", "portugal": "Europe/Lisbon",
+    "prague": "Europe/Prague", "czech republic": "Europe/Prague",
+    "vienna": "Europe/Vienna", "austria": "Europe/Vienna",
+    "budapest": "Europe/Budapest", "hungary": "Europe/Budapest",
+    "bucharest": "Europe/Bucharest", "romania": "Europe/Bucharest",
+    "johannesburg": "Africa/Johannesburg", "south africa": "Africa/Johannesburg",
+    "lagos": "Africa/Lagos", "nigeria": "Africa/Lagos",
+    "nairobi": "Africa/Nairobi", "kenya": "Africa/Nairobi",
+    "bangkok": "Asia/Bangkok", "thailand": "Asia/Bangkok",
+    "jakarta": "Asia/Jakarta", "indonesia": "Asia/Jakarta",
+    "manila": "Asia/Manila", "philippines": "Asia/Manila",
+    "ho chi minh city": "Asia/Ho_Chi_Minh", "vietnam": "Asia/Ho_Chi_Minh",
+    "taipei": "Asia/Taipei", "taiwan": "Asia/Taipei",
+    "karachi": "Asia/Karachi", "pakistan": "Asia/Karachi",
+    "dhaka": "Asia/Dhaka", "bangladesh": "Asia/Dhaka",
+    "tehran": "Asia/Tehran", "iran": "Asia/Tehran",
+    "baghdad": "Asia/Baghdad", "iraq": "Asia/Baghdad",
+    "riyadh": "Asia/Riyadh", "saudi arabia": "Asia/Riyadh",
+    "auckland": "Pacific/Auckland", "wellington": "Pacific/Auckland", "new zealand": "Pacific/Auckland",
+    "perth": "Australia/Perth", "awst": "Australia/Perth",
 };
 
 function setupTimezoneSearch() {
@@ -8073,6 +8117,7 @@ function setupTimezoneSearch() {
         resultDiv.style.cssText = `
             padding: 4px;
             cursor: pointer;
+            color: var(--otk-clock-search-text-color, #e6e6e6);
         `;
         resultDiv.addEventListener('mouseenter', () => {
             resultDiv.style.backgroundColor = '#555';
@@ -8092,34 +8137,89 @@ function setupTimezoneSearch() {
     }
 
     searchInput.addEventListener('input', () => {
-        consoleLog(`[TZ Search] Input event fired. Value: "${searchInput.value}"`);
         const raw = searchInput.value.trim().toLowerCase();
-        const val = raw.replace(/\s+/g, "_");
-        consoleLog(`[TZ Search] Normalized search query: raw='${raw}', val='${val}'`);
-
-        searchResultsDiv.innerHTML = ''; // Clear previous results
+        searchResultsDiv.innerHTML = '';
         addedZones.clear();
 
         if (raw.length < 2) {
-            consoleLog('[TZ Search] Query too short. Aborting search.');
             return;
         }
 
-        consoleLog(`[TZ Search] Checking aliases for '${raw}'...`);
+        // --- New Ranked Search Logic ---
+        const results = [];
+
+        // 1. Direct Alias Match (Highest Priority)
         if (clockCityAliases[raw]) {
             const aliasedZone = clockCityAliases[raw];
-            consoleLog(`[TZ Search] Alias found: '${raw}' -> '${aliasedZone}'. Adding to results.`);
-            addZoneItem(aliasedZone);
+            if (!addedZones.has(aliasedZone)) {
+                results.push({ zone: aliasedZone, rank: 1 });
+                addedZones.add(aliasedZone);
+            }
         }
 
-        consoleLog(`[TZ Search] Filtering ${allTimezones.length} timezones with query '${val}'...`);
-        const filteredTimezones = allTimezones.filter(tz =>
-            tz.toLowerCase().includes(val)
-        );
-        consoleLog(`[TZ Search] Found ${filteredTimezones.length} matches.`);
+        // 2. Word-based and substring matching
+        const queryWords = raw.split(/\s+/).filter(w => w.length > 0);
 
-        filteredTimezones.slice(0, 50).forEach(tz => {
-            addZoneItem(tz);
+        allTimezones.forEach(zone => {
+            if (addedZones.has(zone)) return; // Skip if already added via alias
+
+            const zoneLower = zone.toLowerCase();
+            const zoneParts = zoneLower.split('/');
+            const cityPart = zoneParts[zoneParts.length - 1].replace(/_/g, ' ');
+
+            let rank = 0;
+            let matchFound = false;
+
+            // Rank 2: Exact match of the city name
+            if (cityPart === raw) {
+                rank = 2;
+                matchFound = true;
+            }
+
+            // Rank 3: Starts with match on the city name
+            if (!matchFound && cityPart.startsWith(raw)) {
+                rank = 3;
+                matchFound = true;
+            }
+
+            // Rank 4: Any part of the zone path starts with a query word
+            if (!matchFound) {
+                for (const part of zoneParts) {
+                    if (part.startsWith(raw.replace(/\s+/g, '_'))) {
+                        rank = 4;
+                        matchFound = true;
+                        break;
+                    }
+                }
+            }
+
+            // Rank 5: All query words are present in the zone name
+            if (!matchFound) {
+                const allWordsInZone = queryWords.every(word => zoneLower.includes(word));
+                if (allWordsInZone) {
+                    rank = 5;
+                    matchFound = true;
+                }
+            }
+
+            // Rank 6: Simple includes (fallback)
+            if (!matchFound && zoneLower.includes(raw.replace(/\s+/g, '_'))) {
+                rank = 6;
+                matchFound = true;
+            }
+
+            if (matchFound) {
+                results.push({ zone: zone, rank: rank });
+                addedZones.add(zone); // Use the original casing zone name
+            }
+        });
+
+        // Sort results by rank (lower is better)
+        results.sort((a, b) => a.rank - b.rank);
+
+        // Display top results
+        results.slice(0, 50).forEach(res => {
+            addZoneItem(res.zone);
         });
     });
 }
