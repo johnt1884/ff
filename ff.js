@@ -1687,13 +1687,13 @@ function animateStatIncrease(statEl, plusNEl, from, to) {
         };
     }
 
-    async function renderMessagesInViewer(options = {}) { // Added options parameter
+    async function renderMessagesInViewer(options = {}) {
+    const { isToggleOpen = false } = options;
         if (!otkViewer) {
             consoleError("Viewer element not found, cannot render messages.");
             return;
         }
-        // Determine loading text based on context if possible, or keep generic
-        const loadingText = options.isToggleOpen ? "Restoring view..." : "Loading all messages...";
+        const loadingText = isToggleOpen ? "Restoring view..." : "Loading all messages...";
         showLoadingScreen(loadingText);
 
         // Global sets uniqueImageViewerHashes and uniqueVideoViewerHashes are used directly.
@@ -1850,15 +1850,14 @@ updateDisplayedStatistics(false); // Update stats after all media processing is 
             }, 500);
 
             if (!anchorScrolled) {
-                if (options.isToggleOpen && lastViewerScrollTop > 0) {
+                if (isToggleOpen && lastViewerScrollTop > 0) {
                     messagesContainer.scrollTop = lastViewerScrollTop;
                     consoleLog(`Restored scroll position to: ${lastViewerScrollTop}`);
                 } else if (!storedAnchoredInstanceId) {
-                    // Only scroll to bottom if there's no anchor to handle
                     setTimeout(() => {
                         messagesContainer.scrollTop = messagesContainer.scrollHeight;
                         consoleLog(`No anchored message, scrolling to bottom.`);
-                    }, 550); // Delay slightly after anchor check
+                    }, 550);
                 }
             }
 
@@ -1872,6 +1871,88 @@ updateDisplayedStatistics(false); // Update stats after all media processing is 
             setTimeout(hideLoadingScreen, 500);
         });
     }
+
+    async function appendNewMessagesToViewer(newMessages) {
+        consoleLog(`[appendNewMessagesToViewer] Called with ${newMessages.length} new messages.`);
+        const messagesContainer = document.getElementById('otk-messages-container');
+        if (!messagesContainer) {
+            consoleError("[appendNewMessagesToViewer] messagesContainer not found. Aborting append.");
+            hideLoadingScreen();
+            return;
+        }
+
+        if (newMessages.length === 0) {
+            consoleLog("[appendNewMessagesToViewer] No new messages to append.");
+            hideLoadingScreen();
+            return;
+        }
+
+        const newContentDiv = document.createElement('div');
+
+        const separatorDiv = document.createElement('div');
+        separatorDiv.style.cssText = `
+            border-top: 2px dashed var(--otk-new-messages-divider-color);
+            margin: 20px 0;
+            padding-top: 10px;
+            padding-bottom: 10px;
+            padding-left: 15px;
+            text-align: left;
+            color: var(--otk-new-messages-font-color);
+            font-size: 12px;
+            font-style: italic;
+            width: 100%;
+            box-sizing: border-box;
+        `;
+        const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+        separatorDiv.textContent = `--- ${currentTime} : ${newMessages.length} New Messages Loaded ---`;
+        newContentDiv.appendChild(separatorDiv);
+
+        const mediaLoadPromises = [];
+        const themeSettings = JSON.parse(localStorage.getItem(THEME_SETTINGS_KEY)) || {};
+        const messageLimitEnabled = themeSettings.otkMessageLimitEnabled !== false;
+        const messageLimitValue = parseInt(themeSettings.otkMessageLimitValue || '500', 10);
+
+        for (const message of newMessages) {
+            const boardForLink = message.board || 'b';
+            const threadColor = getThreadColor(message.originalThreadId);
+            const messageElement = createMessageElementDOM(message, mediaLoadPromises, uniqueImageViewerHashes, boardForLink, true, 0, threadColor, null);
+            newContentDiv.appendChild(messageElement);
+            renderedMessageIdsInViewer.add(message.id);
+        }
+
+        messagesContainer.appendChild(newContentDiv);
+
+        if (messageLimitEnabled) {
+            const messageElements = messagesContainer.querySelectorAll('.otk-message-container-main');
+            if (messageElements.length > messageLimitValue) {
+                const numToRemove = messageElements.length - messageLimitValue;
+                consoleLog(`[MessageLimit] Viewer message limit exceeded by ${numToRemove}. Removing oldest messages.`);
+                for (let i = 0; i < numToRemove; i++) {
+                    const messageToRemove = messageElements[i];
+                    const messageId = parseInt(messageToRemove.dataset.messageId, 10);
+                    if (!isNaN(messageId)) {
+                        renderedMessageIdsInViewer.delete(messageId);
+                    }
+                    messageToRemove.remove();
+                }
+            }
+        }
+
+        Promise.all(mediaLoadPromises).then(async () => {
+            hideLoadingScreen();
+
+            // Don't adjust scroll position
+            consoleLog("[appendNewMessagesToViewer] Scroll position intentionally not adjusted after append.");
+
+            viewerActiveImageCount = uniqueImageViewerHashes.size;
+            viewerActiveVideoCount = viewerTopLevelAttachedVideoHashes.size + viewerTopLevelEmbedIds.size;
+            updateDisplayedStatistics();
+        }).catch(err => {
+            consoleError("[appendNewMessagesToViewer] Error in media promises:", err);
+            hideLoadingScreen();
+        });
+    }
+
 
 // Helper function to populate attachmentDiv with media (images/videos)
 function _populateAttachmentDivWithMedia(
@@ -2869,6 +2950,9 @@ function _populateAttachmentDivWithMedia(
         } else { // layoutStyle === 'default' or unknown (original logic)
             const messageDiv = document.createElement('div');
             messageDiv.setAttribute('data-message-id', message.id);
+            if (isTopLevelMessage) {
+                messageDiv.classList.add('otk-message-container-main');
+            }
 
             let backgroundColor;
             let marginLeft = '0';
@@ -3434,82 +3518,6 @@ function _populateAttachmentDivWithMedia(
         } // End of else (default layout)
     }
 
-    async function appendNewMessagesToViewer(newMessages) {
-        consoleLog(`[appendNewMessagesToViewer] Called with ${newMessages.length} new messages.`);
-        const messagesContainer = document.getElementById('otk-messages-container');
-        if (!messagesContainer) {
-            consoleError("[appendNewMessagesToViewer] messagesContainer not found. Aborting append.");
-            hideLoadingScreen();
-            return;
-        }
-
-        if (newMessages.length === 0) {
-            consoleLog("[appendNewMessagesToViewer] No new messages to append.");
-            hideLoadingScreen();
-            return;
-        }
-
-        const newContentDiv = document.createElement('div');
-
-        const separatorDiv = document.createElement('div');
-        separatorDiv.style.cssText = `
-            border-top: 2px dashed var(--otk-new-messages-divider-color);
-            margin: 20px 0;
-            padding-top: 10px;
-            padding-bottom: 10px;
-            padding-left: 15px;
-            text-align: left;
-            color: var(--otk-new-messages-font-color);
-            font-size: 12px;
-            font-style: italic;
-            width: 100%;
-            box-sizing: border-box;
-        `;
-        const currentTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-        separatorDiv.textContent = `--- ${currentTime} : ${newMessages.length} New Messages Loaded ---`;
-        newContentDiv.appendChild(separatorDiv);
-
-        const mediaLoadPromises = [];
-        const themeSettings = JSON.parse(localStorage.getItem(THEME_SETTINGS_KEY)) || {};
-        const messageLimitEnabled = themeSettings.otkMessageLimitEnabled !== false;
-        const messageLimitValue = parseInt(themeSettings.otkMessageLimitValue || '500', 10);
-
-        for (const message of newMessages) {
-            const boardForLink = message.board || 'b';
-            const threadColor = getThreadColor(message.originalThreadId);
-            const messageElement = createMessageElementDOM(message, mediaLoadPromises, uniqueImageViewerHashes, boardForLink, true, 0, threadColor, null);
-            newContentDiv.appendChild(messageElement);
-            renderedMessageIdsInViewer.add(message.id);
-        }
-
-        messagesContainer.appendChild(newContentDiv);
-
-        if (messageLimitEnabled) {
-            const messageElements = messagesContainer.querySelectorAll('.otk-message-container-main, .otk-message-container-quote-depth-1, .otk-message-container-quote-depth-2');
-            if (messageElements.length > messageLimitValue) {
-                const numToRemove = messageElements.length - messageLimitValue;
-                for (let i = 0; i < numToRemove; i++) {
-                    const messageToRemove = messageElements[i];
-                    renderedMessageIdsInViewer.delete(parseInt(messageToRemove.dataset.messageId, 10));
-                    messageToRemove.remove();
-                }
-            }
-        }
-
-        Promise.all(mediaLoadPromises).then(async () => {
-            hideLoadingScreen();
-
-            // Don't adjust scroll position
-            consoleLog("[appendNewMessagesToViewer] Scroll position intentionally not adjusted after append.");
-
-            viewerActiveImageCount = uniqueImageViewerHashes.size;
-            viewerActiveVideoCount = viewerTopLevelAttachedVideoHashes.size + viewerTopLevelEmbedIds.size;
-            updateDisplayedStatistics();
-        }).catch(err => {
-            consoleError("[appendNewMessagesToViewer] Error in media promises:", err);
-            hideLoadingScreen();
-        });
-    }
 
 
     function createThumbnailElement(attachment, board) {
@@ -4203,6 +4211,7 @@ function _populateAttachmentDivWithMedia(
             let threadsProcessedCount = 0;
             const totalThreadsToProcess = threadsToFetch.length;
 
+        let newMessagesToAppend = [];
             // Use a sequential loop for fetching to update loading screen more granularly per thread
             for (const threadId of threadsToFetch) {
                 threadsProcessedCount++;
@@ -4232,6 +4241,7 @@ function _populateAttachmentDivWithMedia(
                             newMessagesData.forEach(m => {
                                 if (!existingIds.has(m.id)) {
                                     updatedMessages.push(m);
+                                newMessagesToAppend.push(m);
                                     actualNewMessagesInThread++;
                                 }
                             });
@@ -4376,31 +4386,12 @@ function _populateAttachmentDivWithMedia(
 
             updateDisplayedStatistics(false);
 
-            // New logic for incremental append or full render
-            const messagesContainer = document.getElementById('otk-messages-container'); // Still needed to check if viewer is open and has container
-
-            // Scroll position logic is removed from here for append.
-            // toggleViewer handles scroll restoration for open/close.
-
-            // Consolidate all messages fetched in this cycle to check for new ones
-            let allFetchedMessagesThisCycle = [];
-            for (const threadId of activeThreads) {
-                if (messagesByThreadId[threadId]) {
-                    allFetchedMessagesThisCycle = allFetchedMessagesThisCycle.concat(messagesByThreadId[threadId]);
-                }
-            }
-            allFetchedMessagesThisCycle.sort((a, b) => a.time - b.time); // Ensure sorted if order matters for append logic
-
-            const newMessagesToAppend = allFetchedMessagesThisCycle.filter(m => !renderedMessageIdsInViewer.has(m.id));
-
-            consoleLog(`[Manual Refresh] About to check viewer state. Is open: ${viewerIsOpen}. New messages to append: ${newMessagesToAppend.length}. Skip viewer update: ${skipViewerUpdate}.`);
-
-            if (!skipViewerUpdate && viewerIsOpen) {
-                consoleLog(`[Manual Refresh] Viewer is open, re-rendering with new data.`);
-                await renderMessagesInViewer({ isToggleOpen: true });
-            } else {
-                consoleLog(`[Manual Refresh] Viewer not updated. Skip viewer update: ${skipViewerUpdate}, Viewer is open: ${viewerIsOpen}`);
-            }
+        if (!skipViewerUpdate && viewerIsOpen) {
+            consoleLog(`[Manual Refresh] Viewer is open, appending ${newMessagesToAppend.length} new messages.`);
+            await appendNewMessagesToViewer(newMessagesToAppend);
+        } else {
+            consoleLog(`[Manual Refresh] Viewer not updated. Skip viewer update: ${skipViewerUpdate}, Viewer is open: ${viewerIsOpen}`);
+        }
             // If viewer is not open, no specific viewer update action here, it will populate on next open.
 
             updateLoadingProgress(100, "Refresh complete!");
@@ -5198,7 +5189,8 @@ function _populateAttachmentDivWithMedia(
     const clockTextElement = document.getElementById('otk-clock-text');
     if (clockTextElement) {
         const savedTimezone = localStorage.getItem('otkClockTimezone') || 'America/Chicago';
-        const timeZoneName = savedTimezone.split('/').pop().replace(/_/g, ' ');
+        const savedPlace = localStorage.getItem('otkClockDisplayPlace');
+        const timeZoneName = savedPlace || savedTimezone.split('/').pop().replace(/_/g, ' ');
 
             const now = new Date();
             const timeString = now.toLocaleTimeString('en-US', {
@@ -7395,46 +7387,35 @@ function applyThemeSettings(options = {}) {
         });
 
         // Make window draggable
-        let isDragging = false;
-        let offsetX, offsetY;
+        let isOptionsDragging = false;
+        let optionsOffsetX, optionsOffsetY;
 
         titleBar.addEventListener('mousedown', (e) => {
             // Prevent dragging if clicking on the close button itself
             if (e.target === closeButton || closeButton.contains(e.target) || e.target.tagName === 'BUTTON') {
                 return;
             }
-            isDragging = true;
-            offsetX = e.clientX - optionsWindow.offsetLeft;
-            offsetY = e.clientY - optionsWindow.offsetTop;
+            isOptionsDragging = true;
+            optionsOffsetX = e.clientX - optionsWindow.offsetLeft;
+            optionsOffsetY = e.clientY - optionsWindow.offsetTop;
             titleBar.style.userSelect = 'none'; // Prevent text selection during drag
             document.body.style.userSelect = 'none'; // Prevent text selection on body during drag
             consoleLog("Draggable window: mousedown");
         });
 
-    document.addEventListener('mousemove', (e) => {
-        if (isClockDragging) {
-            let newLeft = e.clientX - clockOffsetX;
-            let newTop = e.clientY - clockOffsetY;
+        document.addEventListener('mousemove', (e) => {
+            if (isOptionsDragging) {
+                let newLeft = e.clientX - optionsOffsetX;
+                let newTop = e.clientY - optionsOffsetY;
 
-            /*
-            // This logic has been removed to allow unconstrained movement.
-            const buffer = 10;
-            const maxLeft = window.innerWidth - clockElement.offsetWidth - buffer;
-            const maxTop = window.innerHeight - clockElement.offsetHeight - buffer;
-
-            newLeft = Math.max(buffer, Math.min(newLeft, maxLeft));
-            newTop = Math.max(buffer, Math.min(newTop, maxTop));
-            */
-
-            clockElement.style.left = newLeft + 'px';
-            clockElement.style.top = newTop + 'px';
-            clockElement.style.right = 'auto';
-        }
-    });
+                optionsWindow.style.left = newLeft + 'px';
+                optionsWindow.style.top = newTop + 'px';
+            }
+        });
 
         document.addEventListener('mouseup', () => {
-            if (isDragging) {
-                isDragging = false;
+            if (isOptionsDragging) {
+                isOptionsDragging = false;
                 titleBar.style.userSelect = ''; // Re-enable text selection
                 document.body.style.userSelect = '';
                 consoleLog("Draggable window: mouseup");
@@ -7990,6 +7971,7 @@ function applyThemeSettings(options = {}) {
             resultDiv.addEventListener('click', () => {
                 const selectedTimezone = resultDiv.dataset.timezone;
                 localStorage.setItem('otkClockTimezone', selectedTimezone);
+                localStorage.setItem('otkClockDisplayPlace', city.city);
                 updateClock(); // Update immediately
                 document.getElementById('otk-timezone-search-container').style.display = 'none'; // Hide search
                 searchInput.value = '';
