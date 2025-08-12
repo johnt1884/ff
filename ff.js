@@ -1887,6 +1887,29 @@ updateDisplayedStatistics(false); // Update stats after all media processing is 
             return;
         }
 
+        let anchorInfo = { id: null, offset: 0 };
+        const containerRect = messagesContainer.getBoundingClientRect();
+        const messageElements = messagesContainer.querySelectorAll('.otk-message-container-main, .otk-message-container-quote-depth-1');
+        let anchorElement = null;
+
+        for (const el of messageElements) {
+            const elRect = el.getBoundingClientRect();
+            if (elRect.bottom > containerRect.top && elRect.top < containerRect.bottom) {
+                anchorElement = el;
+                break;
+            }
+        }
+
+        if (anchorElement) {
+            anchorInfo.id = anchorElement.id;
+            anchorInfo.offset = anchorElement.getBoundingClientRect().top - containerRect.top;
+            consoleLog(`[ScrollAnchor] Found anchor: ${anchorInfo.id}, offset: ${anchorInfo.offset}`);
+        } else {
+            consoleLog('[ScrollAnchor] No visible anchor element found. Will fallback to basic scroll restore.');
+        }
+
+        const oldScrollTop = messagesContainer.scrollTop; // Keep as fallback
+
         const newContentDiv = document.createElement('div');
 
         const separatorDiv = document.createElement('div');
@@ -1941,8 +1964,20 @@ updateDisplayedStatistics(false); // Update stats after all media processing is 
         Promise.all(mediaLoadPromises).then(async () => {
             hideLoadingScreen();
 
-            // Don't adjust scroll position
-            consoleLog("[appendNewMessagesToViewer] Scroll position intentionally not adjusted after append.");
+            if (anchorInfo.id) {
+                const elementToScrollTo = document.getElementById(anchorInfo.id);
+                if (elementToScrollTo) {
+                    const newScrollTop = elementToScrollTo.offsetTop - anchorInfo.offset;
+                    messagesContainer.scrollTop = newScrollTop;
+                    consoleLog(`[ScrollAnchor] Restored scroll to anchor ${anchorInfo.id}. New scrollTop: ${newScrollTop}`);
+                } else {
+                    messagesContainer.scrollTop = oldScrollTop;
+                    consoleLog(`[ScrollAnchor] Anchor element ${anchorInfo.id} not found. Fell back to old scrollTop.`);
+                }
+            } else {
+                messagesContainer.scrollTop = oldScrollTop;
+                consoleLog(`[ScrollAnchor] No anchor found. Fell back to old scrollTop.`);
+            }
 
             viewerActiveImageCount = uniqueImageViewerHashes.size;
             viewerActiveVideoCount = viewerTopLevelAttachedVideoHashes.size + viewerTopLevelEmbedIds.size;
@@ -2060,24 +2095,34 @@ function _populateAttachmentDivWithMedia(
         const webSrc = `https://i.4cdn.org/${actualBoardForLink}/${message.attachment.tim}${message.attachment.ext}`;
         const thumbSrc = `https://i.4cdn.org/${actualBoardForLink}/${message.attachment.tim}s.jpg`;
 
-        img.onload = () => {
-            img.style.display = 'block';
-        };
-        img.onerror = () => {
-            if (message.attachment.localStoreId && otkMediaDB) {
-                const transaction = otkMediaDB.transaction(['mediaStore'], 'readonly');
-                const store = transaction.objectStore('mediaStore');
-                const request = store.get(img.dataset.mode === 'thumb' ? message.attachment.localThumbStoreId : message.attachment.localStoreId);
-                request.onsuccess = (event) => {
-                    const storedItem = event.target.result;
-                    if (storedItem && storedItem.blob) {
-                        const dataURL = URL.createObjectURL(storedItem.blob);
-                        createdBlobUrls.add(dataURL);
-                        img.src = dataURL;
-                    }
-                };
-            }
-        };
+        mediaLoadPromises.push(new Promise(resolve => {
+            img.onload = () => {
+                img.style.display = 'block';
+                resolve();
+            };
+            img.onerror = () => {
+                if (message.attachment.localStoreId && otkMediaDB) {
+                    const transaction = otkMediaDB.transaction(['mediaStore'], 'readonly');
+                    const store = transaction.objectStore('mediaStore');
+                    const request = store.get(img.dataset.mode === 'thumb' ? message.attachment.localThumbStoreId : message.attachment.localStoreId);
+                    request.onsuccess = (event) => {
+                        const storedItem = event.target.result;
+                        if (storedItem && storedItem.blob) {
+                            const dataURL = URL.createObjectURL(storedItem.blob);
+                            createdBlobUrls.add(dataURL);
+                            img.src = dataURL;
+                        } else {
+                            resolve();
+                        }
+                    };
+                    request.onerror = () => {
+                        resolve();
+                    };
+                } else {
+                    resolve();
+                }
+            };
+        }));
 
         setImageProperties(defaultToThumbnail ? 'thumb' : 'full');
         uniqueImageViewerHashes.add(filehash);
@@ -3945,7 +3990,7 @@ function _populateAttachmentDivWithMedia(
         }
     }
 
-    async function backgroundRefreshThreadsAndMessages(options = {}) { // Added options parameter
+async function backgroundRefreshThreadsAndMessages(options = {}) { // Added options parameter
         const { skipViewerUpdate = false, isBackground = false } = options; // Destructure with default
 
         if (isManualRefreshInProgress) {
@@ -4081,6 +4126,9 @@ function _populateAttachmentDivWithMedia(
             localStorage.setItem('otkNewImagesCount', accumulatedNewImages);
             localStorage.setItem('otkNewVideosCount', accumulatedNewVideos);
 
+            // **FIX: Declare viewerIsOpen before it is used.**
+            const viewerIsOpen = otkViewer && otkViewer.style.display === 'block';
+
             updateDisplayedStatistics(isBackground);
 
             if (viewerIsOpen && !skipViewerUpdate) {
@@ -4088,7 +4136,6 @@ function _populateAttachmentDivWithMedia(
                 await appendNewMessagesToViewer(newMessages);
             }
 
-            const viewerIsOpen = otkViewer && otkViewer.style.display === 'block';
             if (!viewerIsOpen) {
                 consoleLog('[BG Refresh] Viewer is closed. Resynchronizing display snapshot with ground truth.');
                 const allMessages = getAllMessagesSorted();
@@ -7917,7 +7964,7 @@ function applyThemeSettings(options = {}) {
             const reportWindow = window.open("", "Memory Report", "width=600,height=400");
             reportWindow.document.write('<pre>' + report.replace(/\n/g, '<br>') + '</pre>');
         }
-        
+
     async function fetchTimezones() {
         return new Promise((resolve) => {
             GM_xmlhttpRequest({
